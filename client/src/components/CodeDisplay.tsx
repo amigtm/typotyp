@@ -5,7 +5,7 @@ interface CodeDisplayProps {
   code: string
   types: TokenType[]
   caret: number
-  errorAt: number | null
+  mistakes: ReadonlyMap<number, string>
   completing: boolean
 }
 
@@ -16,10 +16,11 @@ interface Cell {
 
 /**
  * Renders the target code one character at a time. Committed characters get a
- * "typed" pop, the pending character carries the caret, and mismatched
- * characters flash red. Newlines render as a subtle "↵" marker.
+ * "typed" pop, mistyped characters show the character the user actually typed
+ * in red (only that keystroke), and the pending character carries a blinking
+ * caret. Newlines render as a subtle "↵" marker.
  */
-export function CodeDisplay({ code, types, caret, errorAt, completing }: CodeDisplayProps) {
+export function CodeDisplay({ code, types, caret, mistakes, completing }: CodeDisplayProps) {
   const lines = useMemo(() => {
     const parts = code.split('\n')
     const result: Cell[][] = []
@@ -48,19 +49,22 @@ export function CodeDisplay({ code, types, caret, errorAt, completing }: CodeDis
             {cells.map((cell) => {
               const isTyped = cell.index < caret
               const isCaret = cell.index === caret
-              const isError = cell.index === errorAt
+              const mistaken = isTyped ? mistakes.get(cell.index) : undefined
               const classes = [
                 'char',
                 `tok-${types[cell.index] ?? 'plain'}`,
                 isTyped ? 'is-typed' : '',
                 isCaret ? 'is-caret' : '',
-                isError ? 'is-error' : '',
+                mistaken !== undefined ? 'is-error' : '',
               ]
                 .filter(Boolean)
                 .join(' ')
+              const display =
+                mistaken ??
+                (cell.ch === '\n' ? '\u23CE' : cell.ch === ' ' ? '\u00A0' : cell.ch)
               return (
                 <span key={cell.index} className={classes}>
-                  {cell.ch === '\n' ? '\u23CE' : cell.ch === ' ' ? '\u00A0' : cell.ch}
+                  {display}
                 </span>
               )
             })}

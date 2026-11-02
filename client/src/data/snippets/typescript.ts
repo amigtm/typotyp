@@ -1,26 +1,18 @@
-export interface Snippet {
-  id: string
-  title: string
-  description: string
-  language: string
-  code: string
-}
+import type { Snippet } from './types'
 
-export const SNIPPETS: Snippet[] = [
+export const TYPESCRIPT_SNIPPETS: Snippet[] = [
   {
-    id: 'sum',
+    id: 'ts-sum',
     title: 'Sum an array',
     description: 'A tiny reducer that totals an array of numbers.',
-    language: 'typescript',
     code: `function sum(numbers: number[]): number {
   return numbers.reduce((total, n) => total + n, 0)
 }`,
   },
   {
-    id: 'counter',
+    id: 'ts-counter',
     title: 'useCounter hook',
     description: 'A small counter hook built on useState.',
-    language: 'typescript',
     code: `function useCounter(initial = 0) {
   const [count, setCount] = useState(initial)
 
@@ -31,10 +23,9 @@ export const SNIPPETS: Snippet[] = [
 }`,
   },
   {
-    id: 'debounce',
+    id: 'ts-debounce',
     title: 'Debounce util',
     description: 'Delay a function call until input stops.',
-    language: 'typescript',
     code: `function debounce(fn: () => void, delay = 300) {
   let timer: ReturnType<typeof setTimeout> | undefined
 

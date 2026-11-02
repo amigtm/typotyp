@@ -1,18 +1,28 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import './App.less'
 import { ThemeProvider } from './theme/ThemeProvider'
 import { useTheme } from './theme/useTheme'
+import { getFont } from './theme/theme'
+import { SoundProvider } from './audio/SoundProvider'
+import { useSound } from './audio/useSound'
 import { useTyping } from './hooks/useTyping'
+import { useIsDesktop } from './hooks/useIsDesktop'
 import { tokenize } from './lib/tokenizer'
+import { LANGUAGES, DEFAULT_LANGUAGE_ID, getLanguage } from './data/snippets'
 import { CodeDisplay } from './components/CodeDisplay'
 import { VirtualKeyboard } from './components/VirtualKeyboard'
-import { KeystrokeLog } from './components/KeystrokeLog'
+import { DeviceGate } from './components/DeviceGate'
 import { Header } from './components/Header'
 
 function TypotypApp() {
   const { theme } = useTheme()
-  const typing = useTyping()
+  const { playKey, playError, playComplete } = useSound()
+  const isDesktop = useIsDesktop()
+  const [langId, setLangId] = useState(DEFAULT_LANGUAGE_ID)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const language = getLanguage(langId)
+  const typing = useTyping(language, isDesktop && !settingsOpen)
   const {
     snippet,
     snippetIndex,
@@ -20,15 +30,36 @@ function TypotypApp() {
     completing,
     episode,
     caret,
-    errorAt,
+    mistakes,
     errorCount,
     keyCount,
     pressedKeys,
     shiftHeld,
-    log,
   } = typing
 
-  const types = useMemo(() => tokenize(snippet.code), [snippet])
+  const font = getFont(theme.fontId)
+
+  // Trigger synthesized sounds when the session state moves. Refs keep us from
+  // replaying sounds when prefs (and therefore the play fns) are recreated.
+  const lastKeyCount = useRef(0)
+  const lastErrorCount = useRef(0)
+  const lastCompleting = useRef(false)
+  useEffect(() => {
+    if (keyCount !== lastKeyCount.current) {
+      lastKeyCount.current = keyCount
+      if (keyCount > 0) playKey()
+    }
+    if (errorCount !== lastErrorCount.current) {
+      lastErrorCount.current = errorCount
+      if (errorCount > 0) playError()
+    }
+    if (completing !== lastCompleting.current) {
+      lastCompleting.current = completing
+      if (completing) playComplete()
+    }
+  }, [keyCount, errorCount, completing, playKey, playError, playComplete])
+
+  const types = useMemo(() => tokenize(snippet.code, language.id), [snippet, language.id])
 
   const vars = useMemo(
     () =>
@@ -37,16 +68,16 @@ function TypotypApp() {
         '--text': theme.text,
         '--code-bg': theme.codeBg,
         '--accent': theme.accent,
-        '--mono': theme.font,
+        '--mono': `${font.family}, ${font.fallback}`,
       }) as CSSProperties,
-    [theme],
+    [theme, font],
   )
 
   const progress = snippet.code.length > 0 ? (caret / snippet.code.length) * 100 : 0
 
   return (
     <div className="app" style={vars}>
-      <Header />
+      <Header settingsOpen={settingsOpen} onOpenChange={setSettingsOpen} />
 
       <main className="app-main">
         <section className="snippet-meta">
@@ -55,7 +86,22 @@ function TypotypApp() {
           </span>
           <h1 className="snippet-title">{snippet.title}</h1>
           <p className="snippet-desc">{snippet.description}</p>
-          <span className="snippet-lang">{snippet.language}</span>
+          <label className="lang-select">
+            <span className="visually-hidden">Language</span>
+            <select
+              value={language.id}
+              onChange={(e) => {
+                setLangId(e.target.value)
+                e.currentTarget.blur()
+              }}
+            >
+              {LANGUAGES.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.label}
+                </option>
+              ))}
+            </select>
+          </label>
         </section>
 
         <div className={`code-panel${completing ? ' is-completing' : ''}`} key={episode}>
@@ -63,7 +109,7 @@ function TypotypApp() {
             code={snippet.code}
             types={types}
             caret={caret}
-            errorAt={errorAt}
+            mistakes={mistakes}
             completing={completing}
           />
         </div>
@@ -77,7 +123,7 @@ function TypotypApp() {
               Progress <b>{Math.round(progress)}%</b>
             </span>
             <span>
-              Keystrokes <b>{keyCount}</b>
+              Keys <b>{keyCount}</b>
             </span>
             <span>
               Errors <b className={errorCount > 0 ? 'is-error' : ''}>{errorCount}</b>
@@ -87,9 +133,10 @@ function TypotypApp() {
       </main>
 
       <footer className="app-footer">
-        <KeystrokeLog log={log} />
         <VirtualKeyboard pressedKeys={pressedKeys} shiftHeld={shiftHeld} />
       </footer>
+
+      {!isDesktop ? <DeviceGate /> : null}
     </div>
   )
 }
@@ -97,7 +144,9 @@ function TypotypApp() {
 function App() {
   return (
     <ThemeProvider>
-      <TypotypApp />
+      <SoundProvider>
+        <TypotypApp />
+      </SoundProvider>
     </ThemeProvider>
   )
 }

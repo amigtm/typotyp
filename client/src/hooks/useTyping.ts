@@ -1,27 +1,21 @@
 import { useEffect, useReducer } from 'react'
-import { SNIPPETS } from '../data/snippets'
-import type { Snippet } from '../data/snippets'
+import type { Language, Snippet } from '../data/snippets'
 
-export interface Keystroke {
-  id: number
-  label: string
-}
-
-export const EXIT_MS = 650
+export const EXIT_MS = 800
 
 const MODIFIER_KEYS = new Set(['Shift', 'Control', 'Alt', 'Meta', 'CapsLock'])
-const LOG_LIMIT = 15
 
 interface TypingState {
+  language: Language
   snippetIndex: number
   episode: number
   caret: number
-  errorAt: number | null
+  /** position -> the character the user actually typed (when it was wrong).
+      Correctly-typed positions simply render the expected character. */
+  mistakes: ReadonlyMap<number, string>
   errorCount: number
   keyCount: number
   pressedKeys: ReadonlySet<string>
-  log: Keystroke[]
-  idCounter: number
 }
 
 type Action =
@@ -29,32 +23,22 @@ type Action =
   | { type: 'depress'; code: string }
   | { type: 'blur' }
   | { type: 'key'; key: string }
+  | { type: 'tab' }
   | { type: 'backspace' }
   | { type: 'advance' }
+  | { type: 'set-lang'; language: Language }
 
-function initialState(): TypingState {
+function initialState(language: Language): TypingState {
   return {
+    language,
     snippetIndex: 0,
     episode: 0,
     caret: 0,
-    errorAt: null,
+    mistakes: new Map(),
     errorCount: 0,
     keyCount: 0,
     pressedKeys: new Set(),
-    log: [],
-    idCounter: 1,
   }
-}
-
-function pushLog(log: Keystroke[], idCounter: number, label: string): [Keystroke[], number] {
-  return [[...log.slice(-(LOG_LIMIT - 1)), { id: idCounter, label }], idCounter + 1]
-}
-
-function keyLabel(key: string): string {
-  if (key === '\n') return '↵'
-  if (key === '\t') return '⇥'
-  if (key === ' ') return '␣'
-  return key
 }
 
 function reducer(state: TypingState, action: Action): TypingState {
@@ -76,54 +60,75 @@ function reducer(state: TypingState, action: Action): TypingState {
     case 'blur':
       return { ...state, pressedKeys: new Set() }
 
+    case 'set-lang':
+      return initialState(action.language)
+
     case 'backspace': {
-      if (state.caret === 0) return state
-      const [log, idCounter] = pushLog(state.log, state.idCounter, '⌫')
+      const code = state.language.snippets[state.snippetIndex].code
+      if (state.caret === 0 || state.caret >= code.length) return state
+      return { ...state, caret: state.caret - 1 }
+    }
+
+    // Loose validation: any printable key advances the caret; the *typed*
+    // character is shown and a mismatch is recorded once as an error
+    // (rendered red) without blocking or cascading.
+    case 'key': {
+      const code = state.language.snippets[state.snippetIndex].code
+      if (state.caret >= code.length) return state
+      const pos = state.caret
+      const mistakes = new Map(state.mistakes)
+      let errorCount = state.errorCount
+
+      if (action.key === code[pos]) {
+        mistakes.delete(pos) // re-typing the correct char clears the mark
+      } else {
+        mistakes.set(pos, action.key)
+        errorCount += 1
+      }
       return {
         ...state,
-        caret: state.caret - 1,
-        errorAt: null,
+        caret: pos + 1,
+        mistakes,
+        errorCount,
         keyCount: state.keyCount + 1,
-        log,
-        idCounter,
       }
     }
 
-    case 'key': {
-      const code = SNIPPETS[state.snippetIndex].code
+    // Tab jumps over a run of indentation spaces (2+), otherwise it behaves
+    // like a loose '\t' keystroke.
+    case 'tab': {
+      const code = state.language.snippets[state.snippetIndex].code
       if (state.caret >= code.length) return state
 
-      const expected = code[state.caret]
-      const [log, idCounter] = pushLog(state.log, state.idCounter, keyLabel(action.key))
+      let end = state.caret
+      while (end < code.length && code[end] === ' ') end++
+      if (end - state.caret >= 2) {
+        return { ...state, caret: end, keyCount: state.keyCount + 1 }
+      }
 
-      if (action.key === expected) {
-        const caret = state.caret + 1
-        return {
-          ...state,
-          caret,
-          errorAt: null,
-          keyCount: state.keyCount + 1,
-          log,
-          idCounter,
-        }
+      const pos = state.caret
+      const mistakes = new Map(state.mistakes)
+      let errorCount = state.errorCount
+      if (code[pos] === '\t') {
+        mistakes.delete(pos)
+      } else {
+        mistakes.set(pos, '\t')
+        errorCount += 1
       }
       return {
         ...state,
-        errorAt: state.caret,
-        errorCount: state.errorCount + 1,
+        caret: pos + 1,
+        mistakes,
+        errorCount,
         keyCount: state.keyCount + 1,
-        log,
-        idCounter,
       }
     }
 
     case 'advance': {
-      const next = (state.snippetIndex + 1) % SNIPPETS.length
-      return {
-        ...initialState(),
-        snippetIndex: next,
-        episode: state.episode + 1,
-      }
+      const snippets = state.language.snippets
+      const next = (state.snippetIndex + 1) % snippets.length
+      const fresh = initialState(state.language)
+      return { ...fresh, snippetIndex: next, episode: state.episode + 1 }
     }
   }
 }
@@ -134,11 +139,18 @@ function isEditableTarget(target: EventTarget | null): boolean {
   return tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || target.isContentEditable
 }
 
-export function useTyping() {
-  const [state, dispatch] = useReducer(reducer, undefined, initialState)
+export function useTyping(language: Language, enabled: boolean) {
+  const [state, dispatch] = useReducer(reducer, undefined, () => initialState(language))
+
+  // Reset the session whenever the language changes so scores start fresh
+  // even if the user returns to a previously-practiced language.
+  useEffect(() => {
+    dispatch({ type: 'set-lang', language })
+  }, [language])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      if (!enabled) return
       const { code, key, repeat, metaKey, ctrlKey, altKey } = event
       dispatch({ type: 'press', code })
 
@@ -149,27 +161,26 @@ export function useTyping() {
         dispatch({ type: 'backspace' })
         return
       }
-
-      // Map special keys to their text representation for strict matching.
+      if (key === 'Tab') {
+        event.preventDefault()
+        dispatch({ type: 'tab' })
+        return
+      }
       if (key === 'Enter') {
         event.preventDefault()
         dispatch({ type: 'key', key: '\n' })
         return
       }
-      if (key === 'Tab') {
-        event.preventDefault()
-        dispatch({ type: 'key', key: '\t' })
-        return
-      }
 
-      // Only single printable characters move the caret; modifiers like
-      // Shift/Control are still captured above for the keyboard reflection.
+      // Modifiers like Shift/Control are still captured above for keyboard
+      // reflection, but only single printable characters advance the caret.
       if (MODIFIER_KEYS.has(key) || key.length !== 1) return
 
       dispatch({ type: 'key', key })
     }
 
     const onKeyUp = (event: KeyboardEvent) => {
+      if (!enabled) return
       dispatch({ type: 'depress', code: event.code })
     }
 
@@ -183,9 +194,9 @@ export function useTyping() {
       window.removeEventListener('keyup', onKeyUp)
       window.removeEventListener('blur', onBlur)
     }
-  }, [])
+  }, [enabled])
 
-  const snippet: Snippet = SNIPPETS[state.snippetIndex]
+  const snippet: Snippet = state.language.snippets[state.snippetIndex]
   const completing = state.caret >= snippet.code.length
 
   // Completion transition: slide out, then advance to the next snippet.
@@ -196,17 +207,17 @@ export function useTyping() {
   }, [completing])
 
   return {
+    language: state.language,
     snippet,
     snippetIndex: state.snippetIndex,
-    total: SNIPPETS.length,
+    total: state.language.snippets.length,
     episode: state.episode,
     completing,
     caret: state.caret,
-    errorAt: state.errorAt,
+    mistakes: state.mistakes,
     errorCount: state.errorCount,
     keyCount: state.keyCount,
     pressedKeys: state.pressedKeys,
     shiftHeld: state.pressedKeys.has('ShiftLeft') || state.pressedKeys.has('ShiftRight'),
-    log: state.log,
   }
 }
