@@ -101,6 +101,30 @@
       font-size: 18px;
       font-weight: 700;
       letter-spacing: -0.01em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+
+      .info-toggle {
+        padding: 2px 8px;
+        border: 1px solid color-mix(in srgb, var(--text) 25%, transparent);
+        border-radius: 999px;
+        background: transparent;
+        color: var(--text);
+        font-family: inherit;
+        font-size: 11.5px;
+        cursor: pointer;
+        transition:
+          border-color 0.15s ease,
+          color 0.15s ease,
+          background-color 0.15s ease;
+
+        &:hover {
+          border-color: var(--accent);
+          color: var(--on-accent, var(--accent));
+          background: var(--accent);
+        }
+      }
     }
 
     .preset-grid {
@@ -241,13 +265,76 @@
         &.primary {
           border: 1px solid transparent;
           background: var(--accent);
-          color: #fff;
+          color: var(--on-accent, #fff);
 
           &:hover {
             filter: brightness(1.08);
           }
         }
       }
+    }
+  }
+}
+
+/* ---------- Info modal ---------- */
+
+.info-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--bg) 82%, rgba(0, 0, 0, 0.3));
+  animation: code-in 0.22s ease both;
+
+  .info-card {
+    width: 340px;
+    max-height: 92svh;
+    overflow-y: auto;
+    padding: 20px;
+    display: grid;
+    gap: 12px;
+    background: var(--code-bg);
+    border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+    border-radius: 14px;
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.2);
+    animation: pop-in 0.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+    text-align: left;
+
+    .info-lead {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.5;
+      color: color-mix(in srgb, var(--text) 80%, transparent);
+    }
+
+    .info-section {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: color-mix(in srgb, var(--text) 60%, transparent);
+    }
+
+    .info-list {
+      margin: 0;
+      padding-left: 18px;
+      font-size: 12.5px;
+      line-height: 1.5;
+      color: color-mix(in srgb, var(--text) 88%, transparent);
+
+      li {
+        margin-bottom: 6px;
+      }
+
+      b {
+        color: var(--accent);
+      }
+    }
+
+    .info-done {
+      justify-self: end;
     }
   }
 }
@@ -391,16 +478,16 @@
 }
 
 .tok-keyword {
-  color: #a626a4;
+  color: var(--tok-keyword, #a626a4);
 }
 .tok-string {
-  color: #50a14f;
+  color: var(--tok-string, #50a14f);
 }
 .tok-number {
-  color: #986801;
+  color: var(--tok-number, #986801);
 }
 .tok-comment {
-  color: #a0a1a7;
+  color: var(--tok-comment, #a0a1a7);
   font-style: italic;
 }
 
@@ -501,10 +588,10 @@
       border-bottom-width: 1px;
       background: var(--accent);
       border-color: var(--accent);
-      color: #fff;
+      color: var(--on-accent, #fff);
 
       .kb-key-shift {
-        color: rgba(255, 255, 255, 0.8);
+        color: color-mix(in srgb, var(--on-accent, #fff) 80%, transparent);
       }
     }
   }
@@ -526,7 +613,7 @@
 @keyframes char-pop {
   0% {
     transform: translateY(-3px) scale(0.9);
-    color: color-mix(in srgb, var(--accent) 70%, #fff);
+    color: color-mix(in srgb, var(--accent) 55%, var(--text));
   }
   55% {
     transform: translateY(0) scale(1.08);

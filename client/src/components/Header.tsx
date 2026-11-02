@@ -18,19 +18,24 @@ export function Header({ settingsOpen, onOpenChange }: HeaderProps) {
   // Draft copies: edits only affect the page after Apply is pressed.
   const [draftTheme, setDraftTheme] = useState<Theme>(theme)
   const [draftSound, setDraftSound] = useState<SoundPrefs>(prefs)
+  const [infoOpen, setInfoOpen] = useState(false)
 
-  // Escape cancels the modal without applying.
+  // Escape cancels the modal (or the info modal) without applying.
   useEffect(() => {
-    if (!settingsOpen) return
+    if (!settingsOpen && !infoOpen) return
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault()
-        onOpenChange(false)
+        if (infoOpen) {
+          setInfoOpen(false)
+        } else {
+          onOpenChange(false)
+        }
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [settingsOpen, onOpenChange])
+  }, [settingsOpen, infoOpen, onOpenChange])
 
   const open = () => {
     setDraftTheme(theme)
@@ -71,7 +76,20 @@ export function Header({ settingsOpen, onOpenChange }: HeaderProps) {
       {settingsOpen ? (
         <div className="settings-modal" role="dialog" aria-modal="true" aria-label="Settings" onClick={cancel}>
           <div className="settings-card" onClick={(e) => e.stopPropagation()}>
-            <h2 className="panel-title">Settings</h2>
+            <h2 className="panel-title">
+              Settings
+              <button
+                type="button"
+                className="info-toggle"
+                aria-label="About typotyp and available settings"
+                onClick={(e) => {
+                  setInfoOpen(true)
+                  e.currentTarget.blur()
+                }}
+              >
+                info
+              </button>
+            </h2>
 
             <div className="panel-section">Theme presets</div>
 
@@ -246,6 +264,40 @@ export function Header({ settingsOpen, onOpenChange }: HeaderProps) {
                 Apply
               </button>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {infoOpen ? (
+        <div className="info-modal" role="dialog" aria-modal="true" aria-label="About typotyp" onClick={() => setInfoOpen(false)}>
+          <div className="info-card" onClick={(e) => e.stopPropagation()}>
+            <h2 className="panel-title">About typotyp</h2>
+            <p className="info-lead">A typing trainer for programmers — practice typing real code, snippet by snippet, and build muscle memory for the code you write.</p>
+            <div className="info-section">What you can configure</div>
+            <ul className="info-list">
+              <li>
+                <b>Language</b> — pick from TypeScript, Python, Rust, C/C++, Java, Zig, C#, Swift, Kotlin, Elixir and more to practice the right syntax.
+              </li>
+              <li>
+                <b>Theme presets</b> — one-click editor themes (Dracula, One Dark Pro, Tokyo Night, Catppuccin, Night Owl, Matcha) or set your own colors.
+              </li>
+              <li>
+                <b>Font</b> — choose a coding font loaded from Google Fonts, from JetBrains Mono to Fira Code and more.
+              </li>
+              <li>
+                <b>Sound</b> — mechanical-keyboard click sounds on keystrokes and a calm procedural music loop while you type.
+              </li>
+              <li>
+                <b>Reset</b> — restore everything to the defaults anytime with one click.
+              </li>
+            </ul>
+            <button
+              type="button"
+              className="btn-settings primary info-done"
+              onClick={() => setInfoOpen(false)}
+            >
+              Got it
+            </button>
           </div>
         </div>
       ) : null}

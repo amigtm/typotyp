@@ -3,6 +3,11 @@
   --text: #000000;
   --code-bg: #ffffff;
   --accent: #3b82f6;
+  --on-accent: #ffffff;
+  --tok-keyword: #a626a4;
+  --tok-string: #50a14f;
+  --tok-number: #986801;
+  --tok-comment: #a0a1a7;
   --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   --sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
 

@@ -142,3 +142,64 @@ export const ThemeContext = createContext<ThemeContextValue | null>(null)
 export function getFont(id: string): MonoFont {
   return MONO_FONTS.find((f) => f.id === id) ?? MONO_FONTS[0]
 }
+
+export interface TokenPalette {
+  keyword: string
+  string: string
+  number: string
+  comment: string
+}
+
+/** Syntax colors tuned for light backgrounds. */
+export const LIGHT_TOKENS: TokenPalette = {
+  keyword: '#a626a4',
+  string: '#0a7d3d',
+  number: '#b06518',
+  comment: '#8c8c96',
+}
+
+/** Syntax colors tuned for dark backgrounds. */
+export const DARK_TOKENS: TokenPalette = {
+  keyword: '#c678dd',
+  string: '#98c379',
+  number: '#d19a66',
+  comment: '#5c6370',
+}
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
+  const clean = hex.trim().replace(/^#/, '')
+  const full =
+    clean.length === 3
+      ? clean.replace(/./g, (c) => c + c)
+      : clean.length === 6
+        ? clean
+        : ''
+  if (full.length !== 6) return null
+  const num = parseInt(full, 16)
+  return { r: (num >> 16) & 0xff, g: (num >> 8) & 0xff, b: num & 0xff }
+}
+
+/** Relative luminance (0..1) of a hex color, or 1 if unparseable. */
+export function luminance(hex: string): number {
+  const rgb = hexToRgb(hex)
+  if (!rgb) return 1
+  const [r, g, b] = [rgb.r / 255, rgb.g / 255, rgb.b / 255].map((v) =>
+    v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4),
+  )
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+
+/** True when the background is dark enough for light-on-dark text. */
+export function isDark(bg: string): boolean {
+  return luminance(bg) < 0.42
+}
+
+/** A readable `--on-accent` text color given the accent color. */
+export function contrastText(bg: string, fallbackLight = '#ffffff', fallbackDark = '#101010'): string {
+  return isDark(bg) ? fallbackLight : fallbackDark
+}
+
+/** The syntax token palette that fits a given background. */
+export function tokensFor(bg: string): TokenPalette {
+  return isDark(bg) ? DARK_TOKENS : LIGHT_TOKENS
+}

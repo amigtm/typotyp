@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react'
 import './App.less'
 import { ThemeProvider } from './theme/ThemeProvider'
 import { useTheme } from './theme/useTheme'
-import { getFont } from './theme/theme'
+import { getFont, contrastText, tokensFor } from './theme/theme'
 import { SoundProvider } from './audio/SoundProvider'
 import { useSound } from './audio/useSound'
 import { useTyping } from './hooks/useTyping'
@@ -38,6 +38,8 @@ function TypotypApp() {
   } = typing
 
   const font = getFont(theme.fontId)
+  const onAccent = contrastText(theme.accent)
+  const tokens = tokensFor(theme.bg)
 
   // Trigger synthesized sounds when the session state moves. Refs keep us from
   // replaying sounds when prefs (and therefore the play fns) are recreated.
@@ -68,9 +70,14 @@ function TypotypApp() {
         '--text': theme.text,
         '--code-bg': theme.codeBg,
         '--accent': theme.accent,
+        '--on-accent': onAccent,
+        '--tok-keyword': tokens.keyword,
+        '--tok-string': tokens.string,
+        '--tok-number': tokens.number,
+        '--tok-comment': tokens.comment,
         '--mono': `${font.family}, ${font.fallback}`,
       }) as CSSProperties,
-    [theme, font],
+    [theme, onAccent, tokens, font],
   )
 
   const progress = snippet.code.length > 0 ? (caret / snippet.code.length) * 100 : 0
